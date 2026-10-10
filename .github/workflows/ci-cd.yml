@@ -1,11 +1,16 @@
 
-name: Food Delivery App CI
+name: Food Delivery App CI/CD
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
 
 jobs:
   validate:
@@ -29,5 +34,46 @@ jobs:
           grep -qi '<body>' index.html
 
       - name: Validate JavaScript
+        run: node --check script.js
+
+      - name: Package application
         run: |
-          node --check script.js
+          mkdir -p dist
+          cp index.html style.css script.js dist/
+          test -f dist/index.html
+          test -f dist/style.css
+          test -f dist/script.js
+
+      - name: Upload packaged application
+        uses: actions/upload-artifact@v4
+        with:
+          name: food-delivery-app
+          path: dist/
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Download packaged application
+        uses: actions/download-artifact@v4
+        with:
+          name: food-delivery-app
+          path: dist/
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
